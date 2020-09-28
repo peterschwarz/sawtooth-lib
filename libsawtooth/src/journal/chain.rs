@@ -621,7 +621,8 @@ fn set_genesis(
                 block.block().header_signature()
             );
         } else {
-            block_validator.validate_block(&block)?;
+            let block_validation_result = block_validator.validate_block(&block)?;
+            block_validation_results.insert(block_validation_result);
 
             if chain_id.is_none() {
                 state

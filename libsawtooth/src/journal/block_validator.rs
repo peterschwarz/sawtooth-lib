@@ -171,7 +171,6 @@ pub struct BlockValidator {
     channel: (InternalSender, Option<InternalReceiver>),
     validation_thread_exit: Arc<AtomicBool>,
     block_scheduler: BlockScheduler<BlockValidationResultStore>,
-    block_status_store: BlockValidationResultStore,
     block_manager: BlockManager,
     transaction_executor: Option<ExecutionTaskSubmitter>,
     scheduler_factory: Option<Box<dyn SchedulerFactory>>,
@@ -198,8 +197,7 @@ impl BlockValidator {
             channel,
             transaction_executor: Some(transaction_executor),
             validation_thread_exit: Arc::new(AtomicBool::new(false)),
-            block_scheduler: BlockScheduler::new(block_manager.clone(), block_status_store.clone()),
-            block_status_store,
+            block_scheduler: BlockScheduler::new(block_manager.clone(), block_status_store),
             block_manager,
             scheduler_factory: Some(scheduler_factory),
             view_factory,
@@ -373,13 +371,15 @@ impl BlockValidator {
         }
     }
 
-    pub fn validate_block(&self, block: &BlockPair) -> Result<(), ValidationError> {
+    pub fn validate_block(
+        &self,
+        block: &BlockPair,
+    ) -> Result<BlockValidationResult, ValidationError> {
         let (tx, rx) = channel();
         self.submit_blocks_for_verification(vec![block.clone()], tx);
         match rx.recv() {
             Ok(ChainControllerRequest::BlockValidation(block_validation_result)) => {
-                self.block_status_store.insert(block_validation_result);
-                Ok(())
+                Ok(block_validation_result)
             }
             Ok(response) => Err(ValidationError::BlockValidationError(format!(
                 "Received unexpected response: {:?}",
