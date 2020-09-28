@@ -377,7 +377,7 @@ impl BlockValidator {
     ) -> Result<BlockValidationResult, ValidationError> {
         let (tx, rx) = channel();
         self.submit_blocks_for_verification(vec![block.clone()], tx);
-        match rx.recv() {
+        let res = match rx.recv() {
             Ok(ChainControllerRequest::BlockValidation(block_validation_result)) => {
                 Ok(block_validation_result)
             }
@@ -389,7 +389,11 @@ impl BlockValidator {
                 "Unable to receive block validation result: {}",
                 err
             ))),
-        }
+        };
+
+        self.block_scheduler.done(block.block().header_signature());
+
+        res
     }
 }
 
